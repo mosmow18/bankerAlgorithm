@@ -165,6 +165,7 @@ public class BankerAlgorithm {
 
     private static void showPrint() {
         System.out.println("===============================================================");
+        appendResult("\t===============================================================");
         System.out.println("Id  max  allocation need");
         appendResult("\tId \t max \t allocation \tneed");
         for (int i = 0; i < processes.length; i++) {
@@ -175,5 +176,7 @@ public class BankerAlgorithm {
         System.out.println("available\t" + show(available));
         appendResult("\tavailable\t" + show(available));
         appendResult("");
+        System.out.println("===============================================================");
+        appendResult("\t===============================================================");
     }
 }
