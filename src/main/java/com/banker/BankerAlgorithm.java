@@ -3,6 +3,7 @@ package com.banker;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -14,6 +15,9 @@ public class BankerAlgorithm {
     static Process[] processes;//进程数组
     static int[] available;//当前可用资源
     static boolean flag = false;//标记是否存在安全序列
+    static List<Integer> set = new ArrayList<>();//存储完成分配资源，已经释放资源的进程
+    static int[][] temp;
+    static boolean[] release;
 
     //进程类
     static class Process{
@@ -81,7 +85,7 @@ public class BankerAlgorithm {
     }
 
     /**
-     *
+     * 处理单个进程请求
      * @param id 进程号
      * @param apply 申请的资源
      */
@@ -89,9 +93,12 @@ public class BankerAlgorithm {
         for (int i = 0; i < m; i++) {//判断请求合法
             if( apply[i] > available[i]){
                 System.out.println("该请求无安全序列");
-                appendResult("\t该请求无安全序列,将产生死锁");
+                appendResult("\t该请求无安全序列,将产生死锁，无法为其分配资源");
+//                back();
+//                showPrint();
                 return;
             }
+
             if(apply[i] > processes[id].need[i]){
                 System.out.println("该请求资源数超过进程实际所需资源");
                 appendResult("\t请求错误,该请求资源数超过进程实际所需资源");
@@ -99,24 +106,63 @@ public class BankerAlgorithm {
             }
         }
 
-        for (int i = 0; i < m; i++) {//处理申请，分配资源
+        boolean ok = true;
+        for (int i = 0; i < m; i++) {//处理申请，为其分配资源
             available[i] -= apply[i];
             processes[id].need[i] -= apply[i];
             processes[id].allocation[i] += apply[i];
+            if(processes[id].need[i] != 0){
+                ok = false;
+            }
         }
-        showPrint();
-        List<Integer> set = new ArrayList<>();
+//        showPrint();
+        if(ok){//如果该进程已完成分配，则释放资源
+            for(int i = 0; i < m; i++){
+                temp[id][i] = processes[id].allocation[i] - apply[i];//存储进程原来的已分配资源,用于产生死锁时，恢复原状态。
+                available[i] += processes[id].allocation[i];
+                processes[id].allocation[i] = 0;
+            }
+            System.out.println(Arrays.toString(temp[id]));
+            set.add(id);
+            release[id] = true;
+        }
+
+        showPrint();//打印
+
         banker(set);//搜索安全序列
+
+        //如果不存在安全序列，会发生死锁，将前面释放的支援都归还原进程
         if(!flag){
             System.out.println("该请求无安全序列,将产生死锁");
-            appendResult("该请求无安全序列,将产生死锁");
-            for (int i = 0; i < m; i++) {//无安全序列，将分配资源归还
-                available[i] += apply[i];
-                processes[id].need[i] += apply[i];
-                processes[id].allocation[i] -= apply[i];
+            appendResult("\t该请求无安全序列,将产生死锁,已归还分配资源");
+            back();
+
+            if(!ok){//本次申请资源没有完全释放，归还已经分配的部分
+                for(int i = 0; i < m; i++){
+                    available[i] += apply[i];
+                    processes[id].need[i] += apply[i];
+                    processes[id].allocation[i] -= apply[i];
+                }
             }
+            showPrint();
         }else{
             flag = false;
+        }
+    }
+
+    /**
+     * 归还前面已经释放的资源
+     */
+    private static void back() {
+        set.clear();
+        for(int i = 0; i < n; i++){//归还前面已经完全释放的资源
+            for (int j = 0; j < m; j++) {
+                if (release[i]){
+                    available[j] -= temp[i][j];
+                    processes[i].allocation[j] = temp[i][j];
+                    processes[i].need[j] = processes[i].max[j] - temp[i][j];
+                }
+            }
         }
     }
 
@@ -140,7 +186,7 @@ public class BankerAlgorithm {
             //该进程还未进行分配完,且该进程可获得资源
             if(!set.contains(i) && check(processes[i])){
                 //进行分配，释放该进程已拥有的资源
-                for(int j = 0; j < m; j++)available[j] += processes[i].allocation[j];
+                for(int j = 0; j < m; j++) available[j] += processes[i].allocation[j];
                 set.add(i);
                 banker(set);//继续搜索可满足的进程,并将i进程标记为已判断
                 //回溯,还原现场,将已释放资源重新还给原进程
@@ -153,12 +199,13 @@ public class BankerAlgorithm {
     public static void init(File selectedFile) throws FileNotFoundException {
 
         readData(selectedFile);
+        temp = new int[n][m];
+        release = new boolean[n];
         showPrint();
-        List<Integer> set = new ArrayList<>();
         banker(set);
         if(!flag){
             System.out.println("该请求无安全序列,将产生死锁");
-            appendResult("该请求无安全序列,将产生死锁");
+            appendResult("\t该请求无安全序列,将产生死锁");
         }
         flag = false;
     }
